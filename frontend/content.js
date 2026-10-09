@@ -119,6 +119,7 @@ async function checkUrl(url) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),
+      signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) throw new Error(`API returned ${res.status}`);
     const data = await res.json();
@@ -182,6 +183,11 @@ function exposeBlockedUrlsToPage() {
 
 async function scanLinks() {
   await loadStoredCache();
+  const settings = await new Promise((resolve) => chrome.storage.local.get(["enabled"], resolve));
+  if (!settings.enabled) {
+    chrome.runtime.sendMessage({ type: "stats", total: 0, safe: 0, suspicious: 0 });
+    return;
+  }
   exposeBlockedUrlsToPage();
 
   const links = Array.from(document.querySelectorAll("a[href]"));
@@ -229,17 +235,19 @@ async function scanLinks() {
       result.score?.toFixed?.(2) ?? result.score
     }`;
 
-    if (result.label === "phishing") {
+    if (result.label === "phishing" || result.label === "suspicious") {
       link.classList.add("phishing-warning");
       suspicious++;
-      saveToStoredCache(href)
+      if (result.label === "phishing") saveToStoredCache(href)
         .then(() => {
           exposeBlockedUrlsToPage();
         })
         .catch(() => {});
-    } else {
+    } else if (result.label === "legitimate") {
       link.classList.add("phishing-safe");
       safe++;
+    } else {
+      link.classList.add("phishing-unknown");
     }
   }
 
