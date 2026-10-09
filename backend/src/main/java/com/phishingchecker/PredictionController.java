@@ -3,7 +3,6 @@ package com.phishingchecker;
 import java.net.IDN;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -60,7 +59,7 @@ public class PredictionController {
         int subdomains = Math.max(0, host.split("\\.").length - 2);
         if (subdomains >= 4) { risk += 0.19; indicators.add("Has an unusually deep subdomain chain"); }
         else if (subdomains >= 2) { risk += 0.07; indicators.add("Uses multiple subdomains"); }
-        if (host.length() >  forty()) { risk += 0.16; indicators.add("Uses an unusually long hostname"); }
+        if (host.length() > 40) { risk += 0.16; indicators.add("Uses an unusually long hostname"); }
         if (url.length() > 120) { risk += 0.10; indicators.add("URL is unusually long"); }
         if (host.contains("-")) { risk += 0.07; indicators.add("Hostname contains hyphens"); }
         if (full.contains("%")) { risk += 0.06; indicators.add("Contains encoded characters"); }
@@ -101,6 +100,5 @@ public class PredictionController {
         return 0;
     }
     private static int count(String value, char c) { int n = 0; for (int i=0;i<value.length();i++) if (value.charAt(i)==c) n++; return n; }
-    private static int forty() { return 40; }
     private static double round(double value) { return Math.round(value * 1000.0) / 1000.0; }
 }
