@@ -1,57 +1,29 @@
+const API = "http://127.0.0.1:8080/predict";
+
 chrome.runtime.onInstalled.addListener(() => {
-  console.log("Phishing Link Checker Extension Installed");
+  console.info("Phishing Link Checker installed");
 });
 
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.type === "manualCheck") {
-    checkCertificate(msg.url).then((certInfo) => {
-      sendResponse(certInfo);
-    });
-    return true;
-  }
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type !== "manualCheck") return false;
+  checkUrl(message.url)
+    .then(sendResponse)
+    .catch((error) => sendResponse({ label: "unknown", score: 0, error: error.message }));
+  return true;
 });
 
-// ✔ FIXED: Chrome security API removed → use HTTPS check fallback
-async function checkCertificate(url) {
-  try {
-    const isHttps = url.startsWith("https://");
-
-    if (!isHttps) {
-      return {
-        label: "suspicious",
-        reason: "Not using HTTPS",
-        score: 0.6,
-      };
-    }
-
-    // If HTTPS, assume certificate exists (we cannot read it in MV3)
-    return {
-      label: "legitimate",
-      reason: "HTTPS enabled (SSL assumed valid)",
-      score: 0.0,
-    };
-  } catch (err) {
-    return {
-      label: "suspicious",
-      reason: "SSL check failed",
-      score: 0.6,
-    };
+async function checkUrl(value) {
+  const url = String(value || "").trim();
+  if (!url) return { label: "unknown", score: 0, error: "Enter a URL." };
+  const response = await fetch(API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.message || `Analysis failed (${response.status}).`);
   }
-}
-
-async function getDomainHealth(domain) {
-  try {
-    const res = await fetch(
-      `https://api.domainsdb.info/v1/domain-info?domain=${domain}`
-    );
-    const data = await res.json();
-
-    return {
-      traffic: data.traffic_rank || 0,
-      blacklist: data.is_blacklisted || false,
-      risk: data.risk_score || 0,
-    };
-  } catch (e) {
-    return { traffic: 0, blacklist: false, risk: 0 };
-  }
+  return response.json();
 }
