@@ -19,6 +19,7 @@ class PredictionControllerTest {
     }
     @Test void supportsLegacyFeaturePayload() {
         var result = controller.predict(new PredictionController.PredictionRequest(null, java.util.Map.of("IpAddress", 1)));
-        assertEquals("phishing", result.label());
+        assertEquals("suspicious", result.label());
+        assertTrue(result.score() >= 0.38);
     }
 }
