@@ -3,15 +3,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const totalEl = document.getElementById("total");
   const safeEl = document.getElementById("safe");
   const suspiciousEl = document.getElementById("suspicious");
-
   const highlightNav = document.getElementById("highlightNav");
   const highlightLong = document.getElementById("highlightLong");
   const highlightLogin = document.getElementById("highlightLogin");
 
   chrome.storage.local.get(["enabled", "options"], (result) => {
-    const enabled = result.enabled || false;
-    updateButton(enabled);
-
+    updateButton(Boolean(result.enabled));
     const opts = result.options || {};
     highlightNav.checked = opts.highlightNav ?? true;
     highlightLong.checked = opts.highlightLong ?? true;
@@ -20,90 +17,77 @@ document.addEventListener("DOMContentLoaded", () => {
 
   toggleBtn.addEventListener("click", () => {
     chrome.storage.local.get(["enabled"], (result) => {
-      const newStatus = !result.enabled;
-      chrome.storage.local.set({ enabled: newStatus }, () => {
-        updateButton(newStatus);
-
+      const enabled = !result.enabled;
+      chrome.storage.local.set({ enabled }, () => {
+        updateButton(enabled);
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          if (tabs[0]) {
-            chrome.tabs.sendMessage(tabs[0].id, { type: "rescan" });
-          }
+          if (tabs[0]?.id) chrome.tabs.sendMessage(tabs[0].id, { type: "rescan" });
         });
       });
     });
   });
 
-  [highlightNav, highlightLong, highlightLogin].forEach((opt) => {
-    opt.addEventListener("change", () => {
-      chrome.storage.local.set({
-        options: {
-          highlightNav: highlightNav.checked,
-          highlightLong: highlightLong.checked,
-          highlightLogin: highlightLogin.checked,
-        },
-      });
-
+  [highlightNav, highlightLong, highlightLogin].forEach((option) => {
+    option.addEventListener("change", () => {
+      chrome.storage.local.set({ options: {
+        highlightNav: highlightNav.checked,
+        highlightLong: highlightLong.checked,
+        highlightLogin: highlightLogin.checked,
+      }});
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]) {
-          chrome.tabs.sendMessage(tabs[0].id, { type: "rescan" });
-        }
+        if (tabs[0]?.id) chrome.tabs.sendMessage(tabs[0].id, { type: "rescan" });
       });
     });
   });
 
-  chrome.runtime.onMessage.addListener((msg) => {
-    if (msg.type === "stats") {
-      totalEl.innerText = msg.total;
-      safeEl.innerText = msg.safe;
-      suspiciousEl.innerText = msg.suspicious;
-    }
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message.type !== "stats") return;
+    totalEl.textContent = message.total;
+    safeEl.textContent = message.safe;
+    suspiciousEl.textContent = message.suspicious;
   });
 
   function updateButton(enabled) {
-    if (enabled) {
-      toggleBtn.innerText = "Disable Scanning";
-      toggleBtn.className = "enabled";
-    } else {
-      toggleBtn.innerText = "Enable Scanning";
-      toggleBtn.className = "disabled";
-    }
+    toggleBtn.textContent = enabled ? "Disable Scanning" : "Enable Scanning";
+    toggleBtn.className = enabled ? "enabled" : "disabled";
   }
-});
 
-const clearCacheBtn = document.getElementById("clearCacheBtn");
-clearCacheBtn.addEventListener("click", () => {
-  chrome.storage.local.remove("suspicious_cache", () => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { type: "rescan" });
+  document.getElementById("clearCacheBtn").addEventListener("click", () => {
+    chrome.storage.local.remove("suspicious_cache", () => {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]?.id) chrome.tabs.sendMessage(tabs[0].id, { type: "rescan" });
+      });
     });
   });
-});
 
-const manualInput = document.getElementById("manualUrl");
-const manualBtn = document.getElementById("checkUrlBtn");
-const manualResult = document.getElementById("manualResult");
-
-manualBtn.addEventListener("click", () => {
-  const url = manualInput.value.trim();
-  if (!url) return;
-
-  chrome.runtime.sendMessage({ type: "manualCheck", url }, (response) => {
-    if (!response) {
-      manualResult.innerText = "Unable to check.";
+  document.getElementById("checkUrlBtn").addEventListener("click", async () => {
+    const input = document.getElementById("manualUrl");
+    const resultEl = document.getElementById("manualResult");
+    const url = input.value.trim();
+    if (!url) {
+      resultEl.style.color = "#b45309";
+      resultEl.textContent = "Enter a URL to check.";
       return;
     }
-
-    const { label, score } = response;
-
-    if (label === "phishing") {
-      manualResult.style.color = "red";
-      manualResult.innerText = "🚨 Dangerous (Red)";
-    } else if (label === "suspicious") {
-      manualResult.style.color = "orange";
-      manualResult.innerText = "⚠️ Mixed Risk (Yellow)";
-    } else {
-      manualResult.style.color = "green";
-      manualResult.innerText = "✅ Safe (Green)";
+    resultEl.style.color = "#475569";
+    resultEl.textContent = "Checking…";
+    try {
+      const result = await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({ type: "manualCheck", url }, (value) => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else resolve(value);
+        });
+      });
+      if (!result || result.label === "unknown") throw new Error(result?.error || "The analysis service is unavailable.");
+      const color = result.label === "phishing" ? "#b91c1c" : result.label === "suspicious" ? "#b45309" : "#15803d";
+      const details = Array.isArray(result.indicators) && result.indicators.length
+        ? ` Reasons: ${result.indicators.join("; ")}.`
+        : "";
+      resultEl.style.color = color;
+      resultEl.textContent = `${result.label.toUpperCase()} · Risk ${Math.round(result.score * 100)}%.${details}`;
+    } catch (error) {
+      resultEl.style.color = "#b91c1c";
+      resultEl.textContent = error.message || "Unable to reach the Java analysis service.";
     }
   });
 });
