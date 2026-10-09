@@ -45,7 +45,7 @@ public class PredictionController {
             String normalized = url.trim();
             if (!normalized.matches("(?i)^https?://.*")) normalized = "https://" + normalized;
             uri = URI.create(normalized);
-            if (uri.getHost() == null || uri.getHost().isBlank() || uri.getUserInfo() != null) throw new IllegalArgumentException();
+            if (uri.getHost() == null || uri.getHost().isBlank()) throw new IllegalArgumentException();
         } catch (RuntimeException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enter a valid HTTP or HTTPS URL.");
         }
@@ -69,7 +69,7 @@ public class PredictionController {
         boolean brandInSubdomain = BRAND_NAMES.stream().anyMatch(b -> host.contains(b) && !host.equals(b + ".com") && !host.endsWith("." + b + ".com"));
         if (brandInSubdomain) { risk += 0.30; indicators.add("Uses a well-known brand name in a non-matching domain"); }
         for (String word : List.of("login", "signin", "verify", "secure", "update", "confirm", "password", "wallet", "account", "recovery")) {
-            if (full.contains(word)) { risk += 0.07; indicators.add("Contains credential or account-action wording"); break; }
+            if (full.contains(word)) { risk += 0.07; indicators.add("Contains credential or account-action wording"); }
         }
         risk = Math.min(0.99, risk);
         String label = risk >= 0.68 ? "phishing" : risk >= 0.38 ? "suspicious" : "legitimate";
