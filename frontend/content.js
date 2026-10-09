@@ -1,4 +1,4 @@
-const API = "http://127.0.0.1:8000/predict";
+const API = "http://127.0.0.1:8080/predict";
 const inMemoryCache = new Map();
 let storedSuspicious = new Set();
 
@@ -118,8 +118,9 @@ async function checkUrl(url) {
     const res = await fetch(API, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ features }),
+      body: JSON.stringify({ url }),
     });
+    if (!res.ok) throw new Error(`API returned ${res.status}`);
     const data = await res.json();
     inMemoryCache.set(url, data);
 
@@ -128,7 +129,7 @@ async function checkUrl(url) {
     }
     return data;
   } catch (err) {
-    const unknown = { label: "unknown", score: 0 };
+    const unknown = { label: "unknown", score: 0, error: "Java API unavailable" };
     inMemoryCache.set(url, unknown);
     return unknown;
   }
