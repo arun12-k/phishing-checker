@@ -134,24 +134,21 @@ public final class UrlNgramModel {
         }
         Arrays.sort(hashes, 0, size);
         int unique = 0;
-        for (int i = 0; i < size; ) {
-            int j = i + 1;
-            while (j < size && hashes[j] == hashes[i]) j++;
-            hashes[unique++] = hashes[i];
-            i = j;
-        }
-        int[] indices = Arrays.copyOf(hashes, unique);
-        float[] values = new float[unique];
-        int cursor = 0;
+        int[] indices = new int[size];
+        float[] values = new float[size];
         double squaredNorm = 0;
         for (int i = 0; i < size; ) {
             int j = i + 1;
             while (j < size && hashes[j] == hashes[i]) j++;
             float count = j - i;
-            values[cursor++] = count;
+            indices[unique] = hashes[i];
+            values[unique] = count;
             squaredNorm += (double) count * count;
+            unique++;
             i = j;
         }
+        indices = Arrays.copyOf(indices, unique);
+        values = Arrays.copyOf(values, unique);
         float norm = (float) Math.sqrt(Math.max(1.0, squaredNorm));
         for (int i = 0; i < values.length; i++) values[i] /= norm;
         return new Vector(indices, values);
