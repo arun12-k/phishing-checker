@@ -23,3 +23,17 @@ jobs:
       - name: Test and package
         run: mvn -B verify
         working-directory: backend
+  extension-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check extension JavaScript syntax
+        run: |
+          for file in frontend/background.js frontend/content.js frontend/inject.js frontend/popup.js frontend/setBlockedUrls.js; do
+            node --check "$file"
+          done
+      - name: Validate extension manifest
+        run: node -e 'JSON.parse(require("fs").readFileSync("frontend/manifest.json", "utf8"))'
