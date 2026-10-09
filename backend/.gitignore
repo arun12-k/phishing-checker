@@ -37,3 +37,7 @@ phishing_kaggle_dataset.csv
 # Cache
 .cache/
 .tmp/
+
+# Private dataset archives and locally trained model artifacts
+*.zip
+model/*.bin
