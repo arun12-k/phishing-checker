@@ -20,6 +20,7 @@ import org.springframework.web.server.ResponseStatusException;
 @CrossOrigin(origins = "*")
 public class PredictionController {
     private static final Pattern IPV4 = Pattern.compile("^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$");
+    private static final UrlNgramModel TRAINED_MODEL = UrlNgramModel.loadIfPresent();
     private static final List<String> BRAND_NAMES = List.of("paypal", "apple", "microsoft", "google", "amazon", "netflix", "facebook", "instagram", "whatsapp", "bank");
 
     public record PredictionRequest(String url, Map<String, Object> features) {}
@@ -47,6 +48,15 @@ public class PredictionController {
             if (uri.getHost() == null || uri.getHost().isBlank()) throw new IllegalArgumentException();
         } catch (RuntimeException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enter a valid HTTP or HTTPS URL.");
+        }
+
+        if (TRAINED_MODEL != null) {
+            double probability = TRAINED_MODEL.phishingProbability(url);
+            String label = probability >= 0.5 ? "phishing" : "legitimate";
+            String level = probability >= 0.75 ? "high" : probability >= 0.35 ? "medium" : "low";
+            return new PredictionResponse(label, round(probability), level,
+                    List.of("Prediction from the trained character n-gram model"),
+                    "Trained character n-gram logistic regression");
         }
 
         String host = IDN.toASCII(uri.getHost()).toLowerCase(Locale.ROOT);
